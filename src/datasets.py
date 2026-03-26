@@ -40,14 +40,7 @@ def get_mnist_dataloaders(batch_size=64, num_workers=2):
 
 def get_cifar10_loaders(batch_size: int = 64, num_workers: int = 2):
     """
-    CIFAR-10 DataLoader를 반환한다.
-    - 학습 시: RandomCrop + RandomHorizontalFlip으로 데이터 증강
-    - 평가 시: 증강 없이 정규화만 적용
-    - 정규화: 채널별 mean/std로 표준화 (모델 수렴 속도 및 정확도 향상)
-
-    주의: 정규화된 입력을 공격 함수에 넘길 때는 clamp 범위를 조정하거나,
-          공격 후 역정규화(denormalize) 처리가 필요하다.
-          → 시각화 시 반드시 denormalize_cifar10() 호출 후 저장할 것
+    CIFAR-10 데이터셋 로더 반환
     """
     train_transform = transforms.Compose([
         # 데이터 증강: 과제 요구사항(≥80% 정확도) 달성을 위해 추가
