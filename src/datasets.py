@@ -14,6 +14,10 @@ from torch.utils.data import DataLoader
 CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR10_STD  = (0.2023, 0.1994, 0.2010)
 
+# MNIST 채널별 mean/std
+MNIST_MEAN = (0.1307,)
+MNIST_STD  = (0.3081,)
+
 def get_mnist_dataloaders(batch_size=64, num_workers=2): 
     """MNIST 데이터셋 로더 반환"""
     transform = transforms.Compose([
@@ -43,3 +47,5 @@ def get_cifar10_dataloaders(batch_size=64, num_workers=2):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     return train_loader, test_loader
+
+def denomalize_cifar10
