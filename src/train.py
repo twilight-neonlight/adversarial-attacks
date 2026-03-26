@@ -11,6 +11,11 @@ MNIST 및 CIFAR-10 모델 학습 모듈.
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import sys
+from pathlib import Path
+
+# 프로젝트 루트를 sys.path에 추가 → 어디서 실행해도 import 경로 일관성 유지
+sys.path.append(str(Path(__file__).parent.parent))
 
 from src.datasets import get_mnist_dataloaders, get_cifar10_dataloaders
 from src.models import MNISTClassifier, ResNet18
