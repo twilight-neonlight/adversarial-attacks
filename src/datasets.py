@@ -85,7 +85,7 @@ def get_cifar10_loaders(batch_size: int = 64, num_workers: int = 2):
     )
     return train_loader, test_loader
 
-def denomalize_cifar10(x: torch.Tensor) -> torch.Tensor:
+def denormalize_cifar10(x: torch.Tensor) -> torch.Tensor:
     """CIFAR-10 정규화된 텐서를 원래 픽셀 범위로 되돌리는 함수"""
     mean = torch.tensor(CIFAR10_MEAN).view(3, 1, 1).to(x.device)
     std = torch.tensor(CIFAR10_STD).view(3, 1, 1).to(x.device)
