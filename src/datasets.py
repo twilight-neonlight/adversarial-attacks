@@ -18,19 +18,24 @@ CIFAR10_STD  = (0.2023, 0.1994, 0.2010)
 MNIST_MEAN = (0.1307,)
 MNIST_STD  = (0.3081,)
 
-def get_mnist_dataloaders(batch_size=64, num_workers=2): 
+def get_mnist_dataloaders(batch_size=64, num_workers=2):
     """MNIST 데이터셋 로더 반환"""
+    # 주의: Normalize 적용 시 픽셀 범위가 [0,1]을 벗어남
+    # → 공격 함수(fgsm.py, pgd.py)에서 clamp 범위를 정규화 공간 기준으로 처리하거나
+    #   denormalize_mnist() 후 [0,1]에서 처리해야 함
     transform = transforms.Compose([
-        transforms.ToTensor(),  # [0,255] -> [0.0,1.0]
-        transforms.Normalize((0.1307,), (0.3081,))  # MNIST mean/std
+        transforms.ToTensor(),              # [0,255] → [0.0,1.0]
+        transforms.Normalize(MNIST_MEAN, MNIST_STD)
     ])
-    
-    train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-    
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    
+
+    train_dataset = datasets.MNIST(root='./data', train=True,  download=True, transform=transform)
+    test_dataset  = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                              num_workers=num_workers, pin_memory=True)
+    test_loader  = DataLoader(test_dataset,  batch_size=batch_size, shuffle=False,
+                              num_workers=num_workers, pin_memory=True)
+
     return train_loader, test_loader
 
 def get_cifar10_dataloaders(batch_size=64, num_workers=2):
