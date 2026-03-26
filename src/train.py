@@ -8,14 +8,15 @@ MNIST 및 CIFAR-10 모델 학습 모듈.
   - cifar10_model.pth
 """
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import sys
 from pathlib import Path
 
 # 프로젝트 루트를 sys.path에 추가 → 어디서 실행해도 import 경로 일관성 유지
 sys.path.append(str(Path(__file__).parent.parent))
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
 from src.datasets import get_mnist_dataloaders, get_cifar10_dataloaders
 from src.models import MNISTClassifier, ResNet18
@@ -23,9 +24,10 @@ from src.models import MNISTClassifier, ResNet18
 # GPU 사용 가능 시 자동으로 CUDA 선택, 없으면 CPU
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 학습된 가중치 저장 경로
-MNIST_MODEL_PATH   = "mnist_model.pth"
-CIFAR10_MODEL_PATH = "cifar10_model.pth"
+# 학습된 가중치 저장 경로 (프로젝트 루트 기준)
+ROOT               = Path(__file__).parent.parent
+MNIST_MODEL_PATH   = ROOT / "mnist_model.pth"
+CIFAR10_MODEL_PATH = ROOT / "cifar10_model.pth"
 
 # ── 공통 헬퍼 ──────────────────────────────────────────────────────────────
 
