@@ -72,6 +72,7 @@ class ResNet18(nn.Module):
         super().__init__()
         self.in_planes = 64
 
+        # CIFAR-10 특화: kernel 7→3, stride 2→1, maxpool 제거
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3,
                                stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
