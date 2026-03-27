@@ -38,7 +38,13 @@ def get_mnist_dataloaders(batch_size=64, num_workers=2):
 
     return train_loader, test_loader
 
-def get_cifar10_loaders(batch_size: int = 64, num_workers: int = 2):
+def denormalize_mnist(x: torch.Tensor) -> torch.Tensor:
+    """정규화된 MNIST 텐서를 [0, 1] 범위로 되돌린다."""
+    mean = torch.tensor(MNIST_MEAN, device=x.device).view(1, 1, 1)
+    std  = torch.tensor(MNIST_STD,  device=x.device).view(1, 1, 1)
+    return (x * std + mean).clamp(0, 1)
+
+def get_cifar10_dataloaders(batch_size: int = 64, num_workers: int = 2):
     """
     CIFAR-10 데이터셋 로더 반환
     """
