@@ -17,6 +17,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from tqdm import tqdm
 
 from src.datasets import get_mnist_dataloaders, get_cifar10_dataloaders
 from src.models import MNISTClassifier, ResNet18
@@ -38,7 +39,7 @@ def train_one_epoch(model, loader, optimizer, criterion):
     """
     model.train()
     running_loss = 0.0
-    for images, labels in loader:
+    for images, labels in tqdm(loader, desc="  Training", leave=False):
         images, labels = images.to(DEVICE), labels.to(DEVICE)
 
         optimizer.zero_grad()                    # 이전 배치의 gradient 초기화
@@ -176,18 +177,19 @@ def train_cifar10(epochs=30, save=True):
         print(f"  Epoch {epoch:2d}/{epochs} | Loss: {loss:.4f} | "
               f"Test Acc: {acc:.2f}% | LR: {current_lr:.4f}")
 
+        # CIFAR-10은 조기 종료 없이 전 에폭 학습
+        # best_acc 갱신 시마다 저장 → 최고 성능 가중치 보존
         if acc > best_acc:
             best_acc = acc
             if save:
                 torch.save(model.state_dict(), CIFAR10_MODEL_PATH)
+            print(f"  ★ 최고 정확도 갱신: {best_acc:.2f}% — 가중치 저장")
 
-        if acc >= 80.0:
-            print(f"\n  ✓ 목표 달성: {acc:.2f}% (≥80%) — 조기 종료")
-            break
+    print(f"\n  최종 best 정확도: {best_acc:.2f}%")
+    if best_acc < 80.0:
+        print("  ✗ 목표 미달 — 에폭 수를 늘리거나 하이퍼파라미터를 점검할 것")
     else:
-        print(f"\n  최종 정확도: {best_acc:.2f}%")
-        if best_acc < 80.0:
-            print("  ✗ 목표 미달 — 에폭 수를 늘리거나 하이퍼파라미터를 점검할 것")
+        print("  ✓ 목표 달성 (≥80%)")
 
     if save:
         print(f"  가중치 저장: {CIFAR10_MODEL_PATH}")
