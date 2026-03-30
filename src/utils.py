@@ -25,3 +25,140 @@ CIFAR10_CLASSES = [
     "dog", "frog", "horse", "ship", "truck"
 ]
 
+# ── 공격 성공률 ────────────────────────────────────────────────────────────
+
+def evaluate_attack(model, attack_fn, loader, device, n_samples=100, targeted=False, target_class=None):
+    """
+    공격 성공률(%) 계산.
+
+    Returns:
+        success_rate: 공격 성공률 (0.0 ~ 100.0)
+    """
+    model.eval()
+    success = 0
+    total   = 0
+
+    for images, labels in loader:
+        for i in range(images.size(0)):
+            if total >= n_samples:
+                break
+
+            x     = images[i].unsqueeze(0).to(device)  # [1, C, H, W]
+            label = labels[i].unsqueeze(0).to(device)  # [1]
+
+            if targeted:
+                # targeted: target_class로 오분류 여부 확인
+                # 정답과 target이 같은 샘플은 스킵 (공격 의미 없음)
+                if labels[i].item() == target_class:
+                    continue
+                y_target = torch.tensor([target_class], device=device)
+                x_adv    = attack_fn(x, y_target)
+            else:
+                # untargeted: 정답 클래스가 아닌 다른 클래스로 오분류 여부 확인
+                x_adv = attack_fn(x, label)
+
+            # 공격 후 예측
+            with torch.no_grad():
+                pred = model(x_adv).argmax(dim=1)
+
+            if targeted:
+                # targeted 성공: target 클래스로 예측
+                success += (pred.item() == target_class)
+            else:
+                # untargeted 성공: 정답 클래스가 아닌 다른 클래스로 예측
+                success += (pred.item() != labels[i].item())
+
+            total += 1
+
+        if total >= n_samples:
+            break
+
+    return success / total * 100
+
+# ── 공격 시각화 ───────────────────────────────────────────────────────────
+
+def visualize_attack(model, attack_fn, loader, device, dataset_name,
+                     attack_name, targeted=False, target_class=None,
+                     n_samples=5, denorm_fn=None):
+    """
+    원본 이미지, adversarial 이미지, perturbation을 나란히 시각화하여 저장.
+    각 샘플에 대해 원본/adversarial/perturbation을 나란히 표시한다.
+    """
+    model.eval()
+    collected = 0
+
+    for images, labels in loader:
+        for i in range(images.size(0)):
+            if collected >= n_samples:
+                break
+
+            x     = images[i].unsqueeze(0).to(device)
+            label = labels[i].unsqueeze(0).to(device)
+
+            if targeted:
+                if labels[i].item() == target_class:
+                    continue
+                y_target = torch.tensor([target_class], device=device)
+                x_adv    = attack_fn(x, y_target)
+            else:
+                x_adv = attack_fn(x, label)
+
+            # 공격 전/후 예측
+            with torch.no_grad():
+                pred_orig = model(x).argmax(dim=1).item()
+                pred_adv  = model(x_adv).argmax(dim=1).item()
+
+            # 시각화를 위해 역정규화 후 CPU로 이동
+            x_vis     = denorm_fn(x.cpu()).squeeze(0)     if denorm_fn else x.cpu().squeeze(0)
+            x_adv_vis = denorm_fn(x_adv.cpu()).squeeze(0) if denorm_fn else x_adv.cpu().squeeze(0)
+
+            # perturbation 시각화: 차이를 magnify해서 보기 쉽게
+            # abs()로 음수 제거, *10으로 확대 후 clamp(0,1)
+            perturbation = (x_adv_vis - x_vis).abs() * 10
+            perturbation = perturbation.clamp(0, 1)
+
+            # 레이블 텍스트 설정
+            if dataset_name == "cifar10":
+                orig_label = CIFAR10_CLASSES[labels[i].item()]
+                orig_pred  = CIFAR10_CLASSES[pred_orig]
+                adv_pred   = CIFAR10_CLASSES[pred_adv]
+            else:
+                orig_label = str(labels[i].item())
+                orig_pred  = str(pred_orig)
+                adv_pred   = str(pred_adv)
+
+            # 3열 subplot: 원본 / adversarial / perturbation
+            fig, axes = plt.subplots(1, 3, figsize=(9, 3))
+
+            # MNIST: (1, H, W) → (H, W), CIFAR-10: (3, H, W) → (H, W, 3)
+            def to_numpy(t):
+                t = t.numpy()
+                return t.squeeze() if dataset_name == "mnist" else t.transpose(1, 2, 0)
+
+            axes[0].imshow(to_numpy(x_vis),          cmap="gray" if dataset_name == "mnist" else None)
+            axes[0].set_title(f"Original\nTrue: {orig_label}\nPred: {orig_pred}")
+            axes[0].axis("off")
+
+            axes[1].imshow(to_numpy(x_adv_vis),      cmap="gray" if dataset_name == "mnist" else None)
+            axes[1].set_title(f"Adversarial\nPred: {adv_pred}")
+            axes[1].axis("off")
+
+            axes[2].imshow(to_numpy(perturbation),   cmap="gray" if dataset_name == "mnist" else None)
+            axes[2].set_title("Perturbation (×10)")
+            axes[2].axis("off")
+
+            plt.tight_layout()
+
+            # results/ 디렉토리에 저장
+            fname = f"{RESULTS_DIR}/{dataset_name}_{attack_name}_{collected+1}.png"
+            plt.savefig(fname, dpi=150, bbox_inches="tight")
+            plt.close()
+
+            collected += 1
+
+        if collected >= n_samples:
+            break
+
+    print(f"  시각화 저장 완료: {RESULTS_DIR}/{dataset_name}_{attack_name}_1~{n_samples}.png")
+
+    
