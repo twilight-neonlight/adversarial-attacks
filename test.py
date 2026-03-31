@@ -27,7 +27,7 @@ from src.models import MNISTClassifier, ResNet18
 from src.train import train_mnist, train_cifar10, MNIST_MODEL_PATH, CIFAR10_MODEL_PATH
 from src.fgsm import fgsm_targeted, fgsm_untargeted
 from src.pgd import pgd_targeted, pgd_untargeted
-from src.utils import evaluate_attack, visualize_attack
+from src.utils import run_attack
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -100,39 +100,35 @@ def run_attacks(model, test_loader, dataset_name, denorm_fn):
     for attack_name, attack_fn, is_targeted in attacks:
         row = f"  {attack_name:<20} |"
         for eps in EPS_LIST:
-            # functools.partial로 model과 eps를 고정한 공격 함수 생성
             if attack_name.startswith("fgsm"):
                 fn = functools.partial(attack_fn, model, epsilon=eps)
             else:
-                # PGD: eps_step은 고정, eps만 변경
                 fn = functools.partial(attack_fn, model,
                                        k=PGD_K, eps=eps, eps_step=PGD_EPS_STEP)
 
-            rate = evaluate_attack(
-                model, fn, test_loader, DEVICE,
-                n_samples=N_SAMPLES,
-                targeted=is_targeted,
-            )
+            # eps별로 성공률만 계산 (시각화는 EPS_DEFAULT에서만)
+            if eps == EPS_DEFAULT:
+                rate = run_attack(
+                    model, fn, test_loader, DEVICE,
+                    dataset_name=dataset_name,
+                    attack_name=attack_name,
+                    targeted=is_targeted,
+                    n_samples=N_SAMPLES,
+                    n_vis=N_VIS,
+                    denorm_fn=denorm_fn,
+                )
+            else:
+                rate = run_attack(
+                    model, fn, test_loader, DEVICE,
+                    dataset_name=dataset_name,
+                    attack_name=attack_name,
+                    targeted=is_targeted,
+                    n_samples=N_SAMPLES,
+                    n_vis=0,
+                    denorm_fn=denorm_fn,
+                )
             row += f" {rate:6.2f}% |"
         print(row)
-
-    # EPS_DEFAULT 기준 시각화 저장
-    print(f"\n  시각화 저장 중 (eps={EPS_DEFAULT})...")
-    for attack_name, attack_fn, is_targeted in attacks:
-        if attack_name.startswith("fgsm"):
-            fn = functools.partial(attack_fn, model, epsilon=EPS_DEFAULT)
-        else:
-            fn = functools.partial(attack_fn, model,
-                                   k=PGD_K, eps=EPS_DEFAULT, eps_step=PGD_EPS_STEP)
-
-        visualize_attack(
-            model, fn, test_loader, DEVICE,
-            dataset_name=dataset_name,
-            attack_name=attack_name,
-            targeted=is_targeted,
-            n_samples=N_VIS,
-            denorm_fn=denorm_fn,
-        )
 
 
 # ── 메인 ───────────────────────────────────────────────────────────────────
