@@ -9,6 +9,7 @@ utils.py
 from pathlib import Path
 
 import torch
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("Agg")  # 화면 출력 없이 파일로 저장 (서버/CLI 환경 대응)
@@ -48,11 +49,9 @@ def run_attack(model, attack_fn, loader, device,
     success_cases = []
     fail_cases    = []
 
-    for images, labels in loader:
+    for images, labels in tqdm(loader, desc=f"  {attack_name}", leave=False):
         for i in range(images.size(0)):
-            # 성공률용 n_samples 및 시각화용 케이스 수집이 모두 끝나면 중단
-            if total >= n_samples and \
-               len(success_cases) >= n_vis and len(fail_cases) >= n_vis:
+            if total >= n_samples:
                 break
 
             x     = images[i].unsqueeze(0).to(device)  # [1, C, H, W]
@@ -76,10 +75,9 @@ def run_attack(model, attack_fn, loader, device,
             else:
                 is_success = (pred_adv != labels[i].item())
 
-            # ── 성공률 카운트 (n_samples개까지) ───────────────────────────
-            if total < n_samples:
-                success += is_success
-                total   += 1
+            # ── 성공률 카운트 ──────────────────────────────────────────────
+            success += is_success
+            total   += 1
 
             # ── 시각화용 케이스 수집 ───────────────────────────────────────
             if len(success_cases) < n_vis or len(fail_cases) < n_vis:
@@ -96,8 +94,7 @@ def run_attack(model, attack_fn, loader, device,
                     if len(fail_cases) < n_vis:
                         fail_cases.append(entry)
 
-        if total >= n_samples and \
-           len(success_cases) >= n_vis and len(fail_cases) >= n_vis:
+        if total >= n_samples:
             break
 
     # ── 성공 케이스 우선으로 n_vis개 채우기 ──────────────────────────────
