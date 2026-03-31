@@ -5,9 +5,14 @@ MNIST 및 CIFAR-10 데이터셋 로딩 유틸리티.
 torchvision을 사용해 데이터를 다운로드하고, DataLoader를 반환한다.
 """
 
+from pathlib import Path
+
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+
+# 프로젝트 루트 기준 data 디렉토리 (src/ 의 상위)
+_DATA_ROOT = str(Path(__file__).parent.parent / "data")
 
 # MNIST 채널별 mean/std
 MNIST_MEAN = (0.1307,)
@@ -28,8 +33,8 @@ def get_mnist_dataloaders(batch_size=64, num_workers=2):
         transforms.Normalize(MNIST_MEAN, MNIST_STD)
     ])
 
-    train_dataset = datasets.MNIST(root='./data', train=True,  download=True, transform=transform)
-    test_dataset  = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    train_dataset = datasets.MNIST(root=_DATA_ROOT, train=True,  download=True, transform=transform)
+    test_dataset  = datasets.MNIST(root=_DATA_ROOT, train=False, download=True, transform=transform)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
                               num_workers=num_workers, pin_memory=True)
@@ -69,10 +74,10 @@ def get_cifar10_dataloaders(batch_size: int = 64, num_workers: int = 2):
     ])
 
     train_dataset = datasets.CIFAR10(
-        root="./data", train=True, download=True, transform=train_transform
+        root=_DATA_ROOT, train=True, download=True, transform=train_transform
     )
     test_dataset = datasets.CIFAR10(
-        root="./data", train=False, download=True, transform=test_transform
+        root=_DATA_ROOT, train=False, download=True, transform=test_transform
     )
 
     train_loader = DataLoader(

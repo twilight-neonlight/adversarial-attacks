@@ -7,7 +7,8 @@ utils.py
 - visualize_attack: 원본/adversarial/perturbation 나란히 시각화 후 results/에 저장
 """
 
-import os
+from pathlib import Path
+
 import torch
 import matplotlib.pyplot as plt
 import matplotlib
@@ -15,9 +16,10 @@ matplotlib.use("Agg")  # 화면 출력 없이 파일로 저장 (서버/CLI 환�
 
 from src.datasets import denormalize_mnist, denormalize_cifar10
 
-# 결과 저장 디렉토리 (과제 요구사항)
-RESULTS_DIR = "results"
-os.makedirs(RESULTS_DIR, exist_ok=True)
+# 프로젝트 루트 기준 results 디렉토리 (src/ 의 상위)
+RESULTS_DIR = Path(__file__).parent.parent / "results"
+RESULTS_DIR.mkdir(exist_ok=True)
+RESULTS_DIR = str(RESULTS_DIR)
 
 # CIFAR-10 클래스 이름 (시각화 레이블용)
 CIFAR10_CLASSES = [
@@ -27,9 +29,12 @@ CIFAR10_CLASSES = [
 
 # ── 공격 성공률 ────────────────────────────────────────────────────────────
 
-def evaluate_attack(model, attack_fn, loader, device, n_samples=100, targeted=False, target_class=None):
+def evaluate_attack(model, attack_fn, loader, device, n_samples=100, targeted=False):
     """
     공격 성공률(%) 계산.
+
+    targeted=True일 때 target은 (label + 1) % 10으로 자동 설정.
+    → 항상 정답과 다른 클래스 보장, 고정 target보다 공정한 평가 가능.
 
     Returns:
         success_rate: 공격 성공률 (0.0 ~ 100.0)
@@ -47,10 +52,8 @@ def evaluate_attack(model, attack_fn, loader, device, n_samples=100, targeted=Fa
             label = labels[i].unsqueeze(0).to(device)  # [1]
 
             if targeted:
-                # targeted: target_class로 오분류 여부 확인
-                # 정답과 target이 같은 샘플은 스킵 (공격 의미 없음)
-                if labels[i].item() == target_class:
-                    continue
+                # (label + 1) % 10: 항상 정답과 다른 클래스로 유도
+                target_class = (labels[i].item() + 1) % 10
                 y_target = torch.tensor([target_class], device=device)
                 x_adv    = attack_fn(x, y_target)
             else:
@@ -78,11 +81,13 @@ def evaluate_attack(model, attack_fn, loader, device, n_samples=100, targeted=Fa
 # ── 공격 시각화 ───────────────────────────────────────────────────────────
 
 def visualize_attack(model, attack_fn, loader, device, dataset_name,
-                     attack_name, targeted=False, target_class=None,
+                     attack_name, targeted=False,
                      n_samples=5, denorm_fn=None):
     """
     원본 이미지, adversarial 이미지, perturbation을 나란히 시각화하여 저장.
     각 샘플에 대해 원본/adversarial/perturbation을 나란히 표시한다.
+
+    targeted=True일 때 target은 (label + 1) % 10으로 자동 설정.
     """
     model.eval()
     collected = 0
@@ -96,8 +101,8 @@ def visualize_attack(model, attack_fn, loader, device, dataset_name,
             label = labels[i].unsqueeze(0).to(device)
 
             if targeted:
-                if labels[i].item() == target_class:
-                    continue
+                # (label + 1) % 10: 항상 정답과 다른 클래스로 유도
+                target_class = (labels[i].item() + 1) % 10
                 y_target = torch.tensor([target_class], device=device)
                 x_adv    = attack_fn(x, y_target)
             else:
