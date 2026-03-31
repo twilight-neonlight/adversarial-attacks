@@ -41,8 +41,9 @@ EPS_DEFAULT = 0.3       # 시각화 및 단일 성공률 출력에 사용할 기
 PGD_K        = 40       # 반복 횟수
 PGD_EPS_STEP = 0.01     # 스텝 크기
 
-N_SAMPLES    = 100      # 성공률 계산 샘플 수 (과제 요구: 최소 100)
-N_VIS        = 5        # 시각화 샘플 수 (과제 요구: 최소 5)
+N_SAMPLES_MNIST   = 1000  # MNIST: 모델이 단순해 빠르게 처리 가능
+N_SAMPLES_CIFAR10 = 100   # CIFAR-10: ResNet18 + PGD 40회로 느리므로 유지
+N_VIS             = 5     # 시각화 샘플 수 (과제 요구: 최소 5)
 
 
 # ── 모델 로드 헬퍼 ─────────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ def load_or_train_cifar10():
 
 # ── 공격 실행 헬퍼 ─────────────────────────────────────────────────────────
 
-def run_attacks(model, test_loader, dataset_name, denorm_fn):
+def run_attacks(model, test_loader, dataset_name, denorm_fn, n_samples):
     """
     4가지 공격을 순서대로 실행한다.
     - 각 공격마다 eps별 성공률 표 출력
@@ -113,7 +114,7 @@ def run_attacks(model, test_loader, dataset_name, denorm_fn):
                     dataset_name=dataset_name,
                     attack_name=attack_name,
                     targeted=is_targeted,
-                    n_samples=N_SAMPLES,
+                    n_samples=n_samples,
                     n_vis=N_VIS,
                     denorm_fn=denorm_fn,
                 )
@@ -123,7 +124,7 @@ def run_attacks(model, test_loader, dataset_name, denorm_fn):
                     dataset_name=dataset_name,
                     attack_name=attack_name,
                     targeted=is_targeted,
-                    n_samples=N_SAMPLES,
+                    n_samples=n_samples,
                     n_vis=0,
                     denorm_fn=denorm_fn,
                 )
@@ -143,7 +144,7 @@ if __name__ == "__main__":
     cifar10_model = load_or_train_cifar10()
 
     # 3. 공격 실행
-    run_attacks(mnist_model,   mnist_test_loader,   "mnist",   denormalize_mnist)
-    run_attacks(cifar10_model, cifar10_test_loader, "cifar10", denormalize_cifar10)
+    run_attacks(mnist_model,   mnist_test_loader,   "mnist",   denormalize_mnist,   N_SAMPLES_MNIST)
+    run_attacks(cifar10_model, cifar10_test_loader, "cifar10", denormalize_cifar10, N_SAMPLES_CIFAR10)
 
     print("\n모든 공격 완료. 결과는 results/ 디렉토리를 확인하세요.")
