@@ -73,6 +73,8 @@ python src/train.py
 | CIFAR-10 eval samples | 1000               |
 | Visualization samples | 5 (success cases preferred, reservoir sampling) |
 
+*GPU defaults shown. When running on CPU, eval samples are automatically reduced to MNIST 1,000 / CIFAR-10 150.*
+
 ## Device & Performance
 
 Device is selected automatically at runtime:
