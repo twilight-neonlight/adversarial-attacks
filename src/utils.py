@@ -8,6 +8,9 @@ utils.py
 
 from pathlib import Path
 
+import math
+import random
+
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -48,6 +51,7 @@ def run_attack(model, attack_fn, loader, device,
     model.eval()
     success       = 0
     total         = 0
+    n_success     = 0  # reservoir sampling용 성공 카운터
     success_cases = []
 
     if device.type == "cpu":
@@ -80,21 +84,27 @@ def run_attack(model, attack_fn, loader, device,
                 success += is_success
                 total   += 1
 
-                if len(success_cases) < n_vis:
+                if is_success:
+                    n_success += 1
                     x_vis     = denorm_fn(x.cpu()).squeeze(0)     if denorm_fn else x.cpu().squeeze(0)
                     x_adv_vis = denorm_fn(x_adv.cpu()).squeeze(0) if denorm_fn else x_adv.cpu().squeeze(0)
                     perturbation = (x_adv_vis - x_vis).abs() * 10
                     perturbation = perturbation.clamp(0, 1)
                     entry = (labels[i].item(), pred_orig, pred_adv, x_vis, x_adv_vis, perturbation)
-                    if is_success:
+                    if n_success <= n_vis:
                         success_cases.append(entry)
+                    else:
+                        j = random.randint(0, n_success - 1)
+                        if j < n_vis:
+                            success_cases[j] = entry
 
             if total >= n_samples:
                 break
 
     else:
         # ── GPU: 배치 단위 처리 ───────────────────────────────────────────
-        for images, labels in tqdm(loader, desc=f"  {attack_name}", leave=False):
+        n_batches = math.ceil(n_samples / loader.batch_size)
+        for images, labels in tqdm(loader, desc=f"  {attack_name}", leave=False, total=n_batches):
             if total >= n_samples:
                 break
 
@@ -126,20 +136,23 @@ def run_attack(model, attack_fn, loader, device,
             success += is_success_batch.sum().item()
             total   += images.size(0)
 
-            if len(success_cases) < n_vis:
-                for i in range(images.size(0)):
-                    if len(success_cases) >= n_vis:
-                        break
-                    if is_success_batch[i].item():
-                        x_vis     = denorm_fn(x[i:i+1].cpu()).squeeze(0)     if denorm_fn else x[i:i+1].cpu().squeeze(0)
-                        x_adv_vis = denorm_fn(x_adv[i:i+1].cpu()).squeeze(0) if denorm_fn else x_adv[i:i+1].cpu().squeeze(0)
-                        perturbation = (x_adv_vis - x_vis).abs() * 10
-                        perturbation = perturbation.clamp(0, 1)
-                        entry = (labels[i].item(), pred_orig_cpu[i].item(), pred_adv_cpu[i].item(),
-                                 x_vis, x_adv_vis, perturbation)
+            for i in range(images.size(0)):
+                if is_success_batch[i].item():
+                    n_success += 1
+                    x_vis     = denorm_fn(x[i:i+1].cpu()).squeeze(0)     if denorm_fn else x[i:i+1].cpu().squeeze(0)
+                    x_adv_vis = denorm_fn(x_adv[i:i+1].cpu()).squeeze(0) if denorm_fn else x_adv[i:i+1].cpu().squeeze(0)
+                    perturbation = (x_adv_vis - x_vis).abs() * 10
+                    perturbation = perturbation.clamp(0, 1)
+                    entry = (labels[i].item(), pred_orig_cpu[i].item(), pred_adv_cpu[i].item(),
+                             x_vis, x_adv_vis, perturbation)
+                    if n_success <= n_vis:
                         success_cases.append(entry)
+                    else:
+                        j = random.randint(0, n_success - 1)
+                        if j < n_vis:
+                            success_cases[j] = entry
 
-    cases = success_cases[:n_vis]
+    cases = success_cases
 
     # ── 한꺼번에 저장 ─────────────────────────────────────────────────────
     def to_numpy(t):

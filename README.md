@@ -68,7 +68,13 @@ python src/train.py
 | PGD step size         | 0.01               |
 | MNIST eval samples    | 10000              |
 | CIFAR-10 eval samples | 1000               |
-| Visualization samples | 5 (success-first)  |
+| Visualization samples | 5 (random reservoir sampling) |
+
+## Device & Performance
+
+Device is selected automatically at runtime:
+- **GPU (CUDA)**: enables cuDNN benchmark, TF32 (Ampere+), and batch-wise attack processing
+- **CPU**: falls back to per-sample processing
 
 ## References
 
