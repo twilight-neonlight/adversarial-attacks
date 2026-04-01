@@ -64,6 +64,12 @@ def run_attack(model, attack_fn, loader, device,
                 x     = images[i].unsqueeze(0).to(device)  # [1, C, H, W]
                 label = labels[i].unsqueeze(0).to(device)  # [1]
 
+                # 원본을 정답으로 예측한 경우에만 공격
+                with torch.no_grad():
+                    pred_orig = model(x).argmax(dim=1).item()
+                if pred_orig != labels[i].item():
+                    continue
+
                 if targeted:
                     target_class = (labels[i].item() + 1) % 10
                     y_target = torch.tensor([target_class], device=device)
@@ -73,7 +79,6 @@ def run_attack(model, attack_fn, loader, device,
                     x_adv = attack_fn(x, label)
 
                 with torch.no_grad():
-                    pred_orig = model(x).argmax(dim=1).item()
                     pred_adv  = model(x_adv).argmax(dim=1).item()
 
                 if targeted:
@@ -115,35 +120,44 @@ def run_attack(model, attack_fn, loader, device,
 
             x = images.to(device)
 
-            if targeted:
-                y_target = ((labels + 1) % 10).to(device)
-                x_adv    = attack_fn(x, y_target)
-            else:
-                x_adv = attack_fn(x, labels.to(device))
-
+            # 원본을 정답으로 예측한 경우에만 공격
             with torch.no_grad():
                 pred_orig_batch = model(x).argmax(dim=1)
-                pred_adv_batch  = model(x_adv).argmax(dim=1)
+            correct_mask   = (pred_orig_batch.cpu() == labels)
+            if correct_mask.sum() == 0:
+                continue
 
-            pred_orig_cpu = pred_orig_batch.cpu()
+            x_correct      = x[correct_mask]
+            labels_correct = labels[correct_mask]
+
+            if targeted:
+                y_target = ((labels_correct + 1) % 10).to(device)
+                x_adv    = attack_fn(x_correct, y_target)
+            else:
+                x_adv = attack_fn(x_correct, labels_correct.to(device))
+
+            with torch.no_grad():
+                pred_adv_batch = model(x_adv).argmax(dim=1)
+
+            pred_orig_cpu = pred_orig_batch[correct_mask].cpu()
             pred_adv_cpu  = pred_adv_batch.cpu()
 
             if targeted:
-                is_success_batch = (pred_adv_cpu == (labels + 1) % 10)
+                is_success_batch = (pred_adv_cpu == (labels_correct + 1) % 10)
             else:
-                is_success_batch = (pred_adv_cpu != labels)
+                is_success_batch = (pred_adv_cpu != labels_correct)
 
             success += is_success_batch.sum().item()
-            total   += images.size(0)
+            total   += correct_mask.sum().item()
 
-            for i in range(images.size(0)):
+            for i in range(x_correct.size(0)):
                 if is_success_batch[i].item():
                     n_success += 1
-                    x_vis     = denorm_fn(x[i:i+1].cpu()).squeeze(0)     if denorm_fn else x[i:i+1].cpu().squeeze(0)
+                    x_vis     = denorm_fn(x_correct[i:i+1].cpu()).squeeze(0)     if denorm_fn else x_correct[i:i+1].cpu().squeeze(0)
                     x_adv_vis = denorm_fn(x_adv[i:i+1].cpu()).squeeze(0) if denorm_fn else x_adv[i:i+1].cpu().squeeze(0)
                     perturbation = (x_adv_vis - x_vis).abs() * 10
                     perturbation = perturbation.clamp(0, 1)
-                    entry = (labels[i].item(), pred_orig_cpu[i].item(), pred_adv_cpu[i].item(),
+                    entry = (labels_correct[i].item(), pred_orig_cpu[i].item(), pred_adv_cpu[i].item(),
                              x_vis, x_adv_vis, perturbation)
                     if n_success <= n_vis:
                         success_cases.append(entry)
