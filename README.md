@@ -25,8 +25,8 @@ adversarial-attacks/
 
 | Dataset  | Architecture        | Test Accuracy |
 |----------|---------------------|---------------|
-| MNIST    | Custom CNN          | 98.38%        |
-| CIFAR-10 | ResNet18            | 92.75%        |
+| MNIST    | Custom CNN          | 98.46%        |
+| CIFAR-10 | ResNet18            | 92.91%        |
 
 ResNet18 architecture adapted from [kuangliu/pytorch-cifar](https://github.com/kuangliu/pytorch-cifar) (MIT License).
 
@@ -66,8 +66,8 @@ python src/train.py
 | epsilon (eps)         | 0.05, 0.1, 0.2, 0.3 |
 | PGD iterations (k)    | 40                 |
 | PGD step size         | 0.01               |
-| MNIST eval samples    | 1000               |
-| CIFAR-10 eval samples | 100                |
+| MNIST eval samples    | 10000              |
+| CIFAR-10 eval samples | 1000               |
 | Visualization samples | 5 (success-first)  |
 
 ## References

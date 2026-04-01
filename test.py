@@ -135,6 +135,21 @@ def run_attacks(model, test_loader, dataset_name, denorm_fn, n_samples):
 # ── 메인 ───────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # 0. 디바이스 정보 출력 및 GPU 최적화
+    if DEVICE.type == "cuda":
+        torch.backends.cudnn.benchmark        = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32        = True
+        gpu_name = torch.cuda.get_device_name(0)
+        vram_gb  = torch.cuda.get_device_properties(0).total_memory / 1024 ** 3
+        print(f"Device : GPU  {gpu_name}  ({vram_gb:.1f} GB)")
+        print(f"  cudnn.benchmark : True")
+        print(f"  TF32 (matmul)   : True")
+        print(f"  TF32 (cuDNN)    : True")
+    else:
+        print("Device : CPU")
+    print()
+
     # 1. 데이터 로더
     _, mnist_test_loader   = get_mnist_dataloaders()
     _, cifar10_test_loader = get_cifar10_dataloaders()

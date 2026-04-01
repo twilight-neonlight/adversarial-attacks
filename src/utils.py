@@ -40,6 +40,8 @@ def run_attack(model, attack_fn, loader, device,
       - targeted  : pred_adv == (label + 1) % 10
       - untargeted: pred_adv != label
 
+    CPU: 샘플 단위 처리 / GPU: 배치 단위 처리
+
     Returns:
         success_rate: 공격 성공률 (0.0 ~ 100.0)
     """
@@ -48,52 +50,96 @@ def run_attack(model, attack_fn, loader, device,
     total         = 0
     success_cases = []
 
-    for images, labels in tqdm(loader, desc=f"  {attack_name}", leave=False):
-        for i in range(images.size(0)):
+    if device.type == "cpu":
+        # ── CPU: 샘플 단위 처리 ───────────────────────────────────────────
+        for images, labels in tqdm(loader, desc=f"  {attack_name}", leave=False):
+            for i in range(images.size(0)):
+                if total >= n_samples:
+                    break
+
+                x     = images[i].unsqueeze(0).to(device)  # [1, C, H, W]
+                label = labels[i].unsqueeze(0).to(device)  # [1]
+
+                if targeted:
+                    target_class = (labels[i].item() + 1) % 10
+                    y_target = torch.tensor([target_class], device=device)
+                    x_adv    = attack_fn(x, y_target)
+                else:
+                    target_class = None
+                    x_adv = attack_fn(x, label)
+
+                with torch.no_grad():
+                    pred_orig = model(x).argmax(dim=1).item()
+                    pred_adv  = model(x_adv).argmax(dim=1).item()
+
+                if targeted:
+                    is_success = (pred_adv == target_class)
+                else:
+                    is_success = (pred_adv != labels[i].item())
+
+                success += is_success
+                total   += 1
+
+                if len(success_cases) < n_vis:
+                    x_vis     = denorm_fn(x.cpu()).squeeze(0)     if denorm_fn else x.cpu().squeeze(0)
+                    x_adv_vis = denorm_fn(x_adv.cpu()).squeeze(0) if denorm_fn else x_adv.cpu().squeeze(0)
+                    perturbation = (x_adv_vis - x_vis).abs() * 10
+                    perturbation = perturbation.clamp(0, 1)
+                    entry = (labels[i].item(), pred_orig, pred_adv, x_vis, x_adv_vis, perturbation)
+                    if is_success:
+                        success_cases.append(entry)
+
             if total >= n_samples:
                 break
 
-            x     = images[i].unsqueeze(0).to(device)  # [1, C, H, W]
-            label = labels[i].unsqueeze(0).to(device)  # [1]
+    else:
+        # ── GPU: 배치 단위 처리 ───────────────────────────────────────────
+        for images, labels in tqdm(loader, desc=f"  {attack_name}", leave=False):
+            if total >= n_samples:
+                break
+
+            # 마지막 배치 truncation (n_samples 초과 방지)
+            remaining = n_samples - total
+            images = images[:remaining]
+            labels = labels[:remaining]
+
+            x = images.to(device)
 
             if targeted:
-                target_class = (labels[i].item() + 1) % 10
-                y_target = torch.tensor([target_class], device=device)
+                y_target = ((labels + 1) % 10).to(device)
                 x_adv    = attack_fn(x, y_target)
             else:
-                target_class = None
-                x_adv = attack_fn(x, label)
+                x_adv = attack_fn(x, labels.to(device))
 
             with torch.no_grad():
-                pred_orig = model(x).argmax(dim=1).item()
-                pred_adv  = model(x_adv).argmax(dim=1).item()
+                pred_orig_batch = model(x).argmax(dim=1)
+                pred_adv_batch  = model(x_adv).argmax(dim=1)
 
-            # 성공 여부 판정
+            pred_orig_cpu = pred_orig_batch.cpu()
+            pred_adv_cpu  = pred_adv_batch.cpu()
+
             if targeted:
-                is_success = (pred_adv == target_class)
+                is_success_batch = (pred_adv_cpu == (labels + 1) % 10)
             else:
-                is_success = (pred_adv != labels[i].item())
+                is_success_batch = (pred_adv_cpu != labels)
 
-            # ── 성공률 카운트 ──────────────────────────────────────────────
-            success += is_success
-            total   += 1
+            success += is_success_batch.sum().item()
+            total   += images.size(0)
 
-            # ── 시각화용 케이스 수집 ───────────────────────────────────────
             if len(success_cases) < n_vis:
-                x_vis     = denorm_fn(x.cpu()).squeeze(0)     if denorm_fn else x.cpu().squeeze(0)
-                x_adv_vis = denorm_fn(x_adv.cpu()).squeeze(0) if denorm_fn else x_adv.cpu().squeeze(0)
-                perturbation = (x_adv_vis - x_vis).abs() * 10
-                perturbation = perturbation.clamp(0, 1)
-
-                entry = (labels[i].item(), pred_orig, pred_adv, x_vis, x_adv_vis, perturbation)
-                if is_success:
-                    if len(success_cases) < n_vis:
+                for i in range(images.size(0)):
+                    if len(success_cases) >= n_vis:
+                        break
+                    if is_success_batch[i].item():
+                        x_vis     = denorm_fn(x[i:i+1].cpu()).squeeze(0)     if denorm_fn else x[i:i+1].cpu().squeeze(0)
+                        x_adv_vis = denorm_fn(x_adv[i:i+1].cpu()).squeeze(0) if denorm_fn else x_adv[i:i+1].cpu().squeeze(0)
+                        perturbation = (x_adv_vis - x_vis).abs() * 10
+                        perturbation = perturbation.clamp(0, 1)
+                        entry = (labels[i].item(), pred_orig_cpu[i].item(), pred_adv_cpu[i].item(),
+                                 x_vis, x_adv_vis, perturbation)
                         success_cases.append(entry)
 
-        if total >= n_samples:
-            break
-
-    cases    = success_cases[:n_vis]
+    cases = success_cases[:n_vis]
 
     # ── 한꺼번에 저장 ─────────────────────────────────────────────────────
     def to_numpy(t):
