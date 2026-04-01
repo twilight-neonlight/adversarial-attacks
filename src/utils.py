@@ -47,7 +47,6 @@ def run_attack(model, attack_fn, loader, device,
     success       = 0
     total         = 0
     success_cases = []
-    fail_cases    = []
 
     for images, labels in tqdm(loader, desc=f"  {attack_name}", leave=False):
         for i in range(images.size(0)):
@@ -80,7 +79,7 @@ def run_attack(model, attack_fn, loader, device,
             total   += 1
 
             # ── 시각화용 케이스 수집 ───────────────────────────────────────
-            if len(success_cases) < n_vis or len(fail_cases) < n_vis:
+            if len(success_cases) < n_vis:
                 x_vis     = denorm_fn(x.cpu()).squeeze(0)     if denorm_fn else x.cpu().squeeze(0)
                 x_adv_vis = denorm_fn(x_adv.cpu()).squeeze(0) if denorm_fn else x_adv.cpu().squeeze(0)
                 perturbation = (x_adv_vis - x_vis).abs() * 10
@@ -90,19 +89,11 @@ def run_attack(model, attack_fn, loader, device,
                 if is_success:
                     if len(success_cases) < n_vis:
                         success_cases.append(entry)
-                else:
-                    if len(fail_cases) < n_vis:
-                        fail_cases.append(entry)
 
         if total >= n_samples:
             break
 
-    # ── 성공 케이스 우선으로 n_vis개 채우기 ──────────────────────────────
     cases    = success_cases[:n_vis]
-    shortage = n_vis - len(cases)
-    if shortage > 0:
-        print(f"  ※ 공격 성공 케이스 부족 ({len(success_cases)}개) → 실패 케이스로 보충")
-        cases += fail_cases[:shortage]
 
     # ── 한꺼번에 저장 ─────────────────────────────────────────────────────
     def to_numpy(t):

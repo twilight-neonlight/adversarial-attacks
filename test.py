@@ -41,8 +41,8 @@ EPS_DEFAULT = 0.3       # 시각화 및 단일 성공률 출력에 사용할 기
 PGD_K        = 40       # 반복 횟수
 PGD_EPS_STEP = 0.01     # 스텝 크기
 
-N_SAMPLES_MNIST   = 1000  # MNIST: 모델이 단순해 빠르게 처리 가능
-N_SAMPLES_CIFAR10 = 100   # CIFAR-10: ResNet18 + PGD 40회로 느리므로 유지
+N_SAMPLES_MNIST   = 10000 # MNIST: 모델이 단순해 빠르게 처리 가능
+N_SAMPLES_CIFAR10 = 1000  # CIFAR-10: ResNet18 + PGD 40회로 느리므로 유지
 N_VIS             = 5     # 시각화 샘플 수 (과제 요구: 최소 5)
 
 
