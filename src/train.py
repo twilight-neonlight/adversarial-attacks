@@ -191,9 +191,6 @@ def train_cifar10(epochs=30, save=True):
     else:
         print("  ✓ 목표 달성 (≥80%)")
 
-    if save:
-        print(f"  가중치 저장: {CIFAR10_MODEL_PATH}")
-
     model.eval()
     return model
 
