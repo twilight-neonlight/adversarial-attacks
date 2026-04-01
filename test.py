@@ -148,6 +148,8 @@ if __name__ == "__main__":
         print(f"  TF32 (cuDNN)    : True")
     else:
         print("Device : CPU")
+        N_SAMPLES_MNIST   = 1000
+        N_SAMPLES_CIFAR10 = 150
     print()
 
     # 1. 데이터 로더
